@@ -8,6 +8,7 @@ import { z } from "zod";
 import { parseReceiptContent } from "./lib/parse-receipt-texts";
 import { parsePdf } from "./lib/parse-pdf";
 import { ReceiptParsingError } from "./lib/receipt-parsing-error";
+import { Blob } from "buffer";
 
 const server = fastify({ logger: true });
 server.setValidatorCompiler(validatorCompiler);
