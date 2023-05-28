@@ -1,47 +1,36 @@
 import { fastify } from "fastify";
-import {
-  serializerCompiler,
-  validatorCompiler,
-  ZodTypeProvider,
-} from "fastify-type-provider-zod";
-import { z } from "zod";
 import { parseReceiptContent } from "./lib/parse-receipt-texts";
 import { parsePdf } from "./lib/parse-pdf";
 import { ReceiptParsingError } from "./lib/receipt-parsing-error";
-import { Blob } from "buffer";
+import FastifyMultipart from "@fastify/multipart";
 
 const server = fastify({ logger: true });
-server.setValidatorCompiler(validatorCompiler);
-server.setSerializerCompiler(serializerCompiler);
+server.register(FastifyMultipart);
 
-server.withTypeProvider<ZodTypeProvider>().route({
-  method: "POST",
-  url: "/parse-receipt",
-  schema: {
-    body: z.object({
-      pdf: z.instanceof(Blob),
-    }),
-  },
-  handler: async (req, res) => {
-    const pdf = await req.body.pdf
-      .arrayBuffer()
-      .then(Buffer.from)
-      .then(parsePdf);
+server.post("/", async (req, res) => {
+  const file = await req.file();
 
-    try {
-      const receipt = parseReceiptContent(pdf);
+  if (!file) {
+    res.status(400).send({ message: "No file provided" });
+    return;
+  }
 
-      res.send({ receipt });
+  const buffer = await file.toBuffer();
+  const pdf = await parsePdf(buffer);
+
+  try {
+    const receipt = parseReceiptContent(pdf);
+
+    res.send({ receipt });
+    return;
+  } catch (e) {
+    if (e instanceof ReceiptParsingError) {
+      res.status(400).send({ message: e.message });
       return;
-    } catch (e) {
-      if (e instanceof ReceiptParsingError) {
-        res.status(400).send({ message: e.message });
-        return;
-      }
     }
+  }
 
-    res.status(500).send({ message: "Internal server error" });
-  },
+  res.status(500).send({ message: "Internal server error" });
 });
 
 server.listen({ port: Number(process.env.PORT) || 8080 }, (err, address) => {
