@@ -43,8 +43,11 @@ server.post("/", async (req, res) => {
 
 async function start() {
   try {
+    const host =
+      process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost";
     const port = process.env.PORT ? parseInt(process.env.PORT) : 8080;
-    await server.listen({ port });
+
+    await server.listen({ host, port });
   } catch (err) {
     server.log.error(err);
     process.exit(1);
