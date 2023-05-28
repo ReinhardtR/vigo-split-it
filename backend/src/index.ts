@@ -5,47 +5,50 @@ import { ReceiptParsingError } from "./lib/receipt-parsing-error";
 import FastifyMultipart from "@fastify/multipart";
 import FastifyCors from "@fastify/cors";
 
-async function startServer() {
-  const server = fastify({ logger: true });
+const server = fastify({ logger: true });
 
-  await server.register(FastifyCors);
-  await server.register(FastifyMultipart);
+server.register(FastifyCors);
+server.register(FastifyMultipart);
 
-  server.post("/", async (req, res) => {
-    const file = await req.file();
+server.post("/", async (req, res) => {
+  const file = await req.file();
 
-    if (!file) {
-      res.status(400).send({ message: "No file provided" });
+  if (!file) {
+    res.status(400).send({ message: "No file provided" });
+    return;
+  }
+
+  if (file.mimetype !== "application/pdf") {
+    res.status(400).send({ message: "File is not a PDF" });
+    return;
+  }
+
+  const buffer = await file.toBuffer();
+  const pdf = await parsePdf(buffer);
+
+  try {
+    const receipt = parseReceiptContent(pdf);
+
+    res.send({ receipt });
+    return;
+  } catch (e) {
+    if (e instanceof ReceiptParsingError) {
+      res.status(400).send({ message: e.message });
       return;
     }
+  }
 
-    if (file.mimetype !== "application/pdf") {
-      res.status(400).send({ message: "File is not a PDF" });
-      return;
-    }
+  res.status(500).send({ message: "Internal server error" });
+});
 
-    const buffer = await file.toBuffer();
-    const pdf = await parsePdf(buffer);
-
-    try {
-      const receipt = parseReceiptContent(pdf);
-
-      res.send({ receipt });
-      return;
-    } catch (e) {
-      if (e instanceof ReceiptParsingError) {
-        res.status(400).send({ message: e.message });
-        return;
-      }
-    }
-
-    res.status(500).send({ message: "Internal server error" });
-  });
-
-  await server.listen({ port: Number(process.env.PORT) || 8080 });
+async function start() {
+  try {
+    const port = process.env.PORT ? parseInt(process.env.PORT) : 8080;
+    await server.listen({ port });
+  } catch (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
 }
 
-startServer().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+start();
