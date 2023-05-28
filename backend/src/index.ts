@@ -8,7 +8,7 @@ import FastifyCors from "@fastify/cors";
 const server = fastify({ logger: true });
 server.register(FastifyCors, {
   origin: "*",
-  methods: "*",
+  methods: ["POST"],
 });
 server.register(FastifyMultipart);
 
