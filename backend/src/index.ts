@@ -5,14 +5,10 @@ import { ReceiptParsingError } from "./lib/receipt-parsing-error";
 import FastifyMultipart from "@fastify/multipart";
 import FastifyCors from "@fastify/cors";
 
-(async function () {
+async function startServer() {
   const server = fastify({ logger: true });
 
-  await server.register(FastifyCors, {
-    origin: "*",
-    methods: ["POST"],
-    allowedHeaders: ["Content-Type"],
-  });
+  await server.register(FastifyCors);
   await server.register(FastifyMultipart);
 
   server.post("/", async (req, res) => {
@@ -46,11 +42,10 @@ import FastifyCors from "@fastify/cors";
     res.status(500).send({ message: "Internal server error" });
   });
 
-  server.listen({ port: Number(process.env.PORT) || 8080 }, (err, address) => {
-    if (err) {
-      console.error(err);
-      process.exit(1);
-    }
-    console.log(`Server listening at ${address}`);
-  });
-})();
+  await server.listen({ port: Number(process.env.PORT) || 8080 });
+}
+
+startServer().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
