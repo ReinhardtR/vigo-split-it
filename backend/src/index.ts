@@ -3,8 +3,12 @@ import { parseReceiptContent } from "./lib/parse-receipt-texts";
 import { parsePdf } from "./lib/parse-pdf";
 import { ReceiptParsingError } from "./lib/receipt-parsing-error";
 import FastifyMultipart from "@fastify/multipart";
+import FastifyCors from "@fastify/cors";
 
 const server = fastify({ logger: true });
+server.register(FastifyCors, {
+  origin: "*",
+});
 server.register(FastifyMultipart);
 
 server.post("/", async (req, res) => {
@@ -12,6 +16,11 @@ server.post("/", async (req, res) => {
 
   if (!file) {
     res.status(400).send({ message: "No file provided" });
+    return;
+  }
+
+  if (file.mimetype !== "application/pdf") {
+    res.status(400).send({ message: "File is not a PDF" });
     return;
   }
 
