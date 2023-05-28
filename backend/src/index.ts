@@ -6,11 +6,12 @@ import FastifyMultipart from "@fastify/multipart";
 import FastifyCors from "@fastify/cors";
 
 const server = fastify({ logger: true });
-server.register(FastifyCors, {
+
+await server.register(FastifyCors, {
   origin: "*",
   methods: ["POST"],
 });
-server.register(FastifyMultipart);
+await server.register(FastifyMultipart);
 
 server.post("/", async (req, res) => {
   const file = await req.file();
