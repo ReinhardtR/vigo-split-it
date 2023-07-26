@@ -1,11 +1,12 @@
 import { Output } from "pdf2json";
 import { ReceiptParsingError } from "./receipt-parsing-error";
 import { dateFromDFormat } from "../utils/date-from-d-format";
+import Decimal from "decimal.js";
 
 type Item = {
   name: string;
-  price: number;
-  discount: number;
+  price: Decimal;
+  discount: Decimal;
 };
 
 export function parseReceiptContent(content: Output) {
@@ -43,8 +44,7 @@ export function parseReceiptContent(content: Output) {
   const itemSectionTexts = page.Texts.filter(
     (text) => text.y >= itemsStartLine.y && text.y <= itemsEndLine.y
   );
-  const itemLines: { name: string; price: number; quantity: number }[] = [];
-
+  const itemLines: { name: string; price: Decimal; quantity: number }[] = [];
   for (let i = 0; i < itemSectionTexts.length; i++) {
     const text = itemSectionTexts[i];
 
@@ -57,7 +57,7 @@ export function parseReceiptContent(content: Output) {
     const createNewItemLine = () => {
       itemLines.push({
         name: decodeURIComponent(textContent),
-        price: 0,
+        price: new Decimal(0),
         quantity: 1,
       });
     };
@@ -80,7 +80,7 @@ export function parseReceiptContent(content: Output) {
 
     const price = Number(decodeURIComponent(textContent).replace(",", "."));
     if (!Number.isNaN(price)) {
-      latestItemLine.price = price;
+      latestItemLine.price = new Decimal(price);
       continue;
     }
 
@@ -99,7 +99,20 @@ export function parseReceiptContent(content: Output) {
         );
       }
 
-      prevItem.discount = itemLine.price;
+      const prevItemsWithSameName: Item[] = [];
+      for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+
+        if (item && item.name === prevItem.name) {
+          prevItemsWithSameName.push(item);
+        } else {
+          break;
+        }
+      }
+
+      prevItemsWithSameName.forEach((item) => {
+        item.discount = itemLine.price.div(prevItemsWithSameName.length);
+      });
 
       return;
     }
@@ -107,17 +120,18 @@ export function parseReceiptContent(content: Output) {
     for (let i = 0; i < itemLine.quantity; i++) {
       items.push({
         name: itemLine.name,
-        price: itemLine.price / itemLine.quantity,
-        discount: 0,
+        price: itemLine.price.div(itemLine.quantity),
+        discount: new Decimal(0),
       });
     }
   });
 
   console.log(items);
 
-  const totalFromItems = items.reduce((sum, item) => {
-    return sum + item.price + item.discount;
-  }, 0);
+  const totalFromItems = items.reduce(
+    (sum, item) => sum.add(item.price.add(item.discount)),
+    new Decimal(0)
+  );
 
   const summaryTexts = page.Texts.filter(
     (text) => text.y >= summaryStartLine.y && text.y <= summaryEndLine.y
@@ -129,15 +143,17 @@ export function parseReceiptContent(content: Output) {
     throw new ReceiptParsingError("Could not find total in receipt.");
   }
 
-  const total = Number(decodeURIComponent(totalText.R[0].T).replace(",", "."));
+  const total = new Decimal(
+    decodeURIComponent(totalText.R[0].T).replace(",", ".")
+  );
 
-  if (Number.isNaN(total)) {
+  if (total.isNaN()) {
     throw new ReceiptParsingError(
       `Coulnd not parse total from receipt. (${totalText.R[0].T})`
     );
   }
 
-  if (total !== totalFromItems) {
+  if (!total.eq(totalFromItems)) {
     throw new ReceiptParsingError(
       `Total from items (${totalFromItems}) does not match total from receipt (${total}).`
     );
@@ -146,7 +162,11 @@ export function parseReceiptContent(content: Output) {
   return {
     title,
     creationDate,
-    total,
-    items,
+    total: total.toNumber(),
+    items: items.map((item) => ({
+      ...item,
+      price: item.price.toNumber(),
+      discount: item.discount.toNumber(),
+    })),
   };
 }

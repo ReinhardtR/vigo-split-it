@@ -36,6 +36,13 @@ server.post("/", async (req, res) => {
       res.status(400).send({ message: e.message });
       return;
     }
+
+    res.status(500).send({
+      message:
+        "Internal server error" +
+        ((e as any).message && `: ${(e as any).message}`),
+    });
+    console.error(e);
   }
 
   res.status(500).send({ message: "Internal server error" });
