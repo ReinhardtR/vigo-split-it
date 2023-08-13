@@ -87,6 +87,8 @@ export function parseReceiptContent(content: Output) {
     createNewItemLine();
   }
 
+  console.log(itemLines);
+
   const items: Item[] = [];
   itemLines.forEach((itemLine) => {
     const isDiscountItem = itemLine.name.includes("Rabat");
@@ -103,7 +105,7 @@ export function parseReceiptContent(content: Output) {
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
 
-        if (item && item.name === prevItem.name) {
+        if (item && item.name === prevItem.name && item.discount.eq(0)) {
           prevItemsWithSameName.push(item);
         } else {
           break;
@@ -149,7 +151,7 @@ export function parseReceiptContent(content: Output) {
 
   if (total.isNaN()) {
     throw new ReceiptParsingError(
-      `Coulnd not parse total from receipt. (${totalText.R[0].T})`
+      `Could not parse total from receipt. (${totalText.R[0].T})`
     );
   }
 
